@@ -1,0 +1,86 @@
+id: batch-issue-autofix
+namespace: dev.autofix
+description: Process multiple issues from a repository in batch
+
+inputs:
+  - id: repo_url
+    type: STRING
+    required: true
+    description: "Repository URL (e.g., https://github.com/owner/repo.git)"
+  
+  - id: issue_labels
+    type: STRING
+    defaults: "bug"
+    description: "Comma-separated labels to filter issues (e.g., 'bug,enhancement')"
+  
+  - id: max_issues
+    type: INT
+    defaults: 5
+    description: "Maximum number of issues to process"
+  
+  - id: create_prs
+    type: BOOLEAN
+    defaults: false
+    description: "Whether to create pull requests for fixes"
+
+tasks:
+  - id: extract_repo_info
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "Extract owner and repo name from URL"
+    commands:
+      - |
+        REPO_URL="{{ inputs.repo_url }}"
+        REPO_PATH=$(echo $REPO_URL | sed 's/.*github.com\///' | sed 's/\.git$//')
+        echo "::set-output name=repo_path::$REPO_PATH"
+    outputs:
+      repo_path: "{{ outputs.extract_repo_info.vars.repo_path }}"
+
+  - id: fetch_issues
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "Fetch open issues from GitHub"
+    env:
+      GITHUB_TOKEN: "{{ secret('GITHUB_TOKEN') }}"
+    commands:
+      - |
+        curl -s -H "Authorization: token $GITHUB_TOKEN" \
+          "https://api.github.com/repos/{{ outputs.extract_repo_info.vars.repo_path }}/issues?state=open&labels={{ inputs.issue_labels }}&per_page={{ inputs.max_issues }}" \
+          > /tmp/issues.json
+        cat /tmp/issues.json | jq -r '.[].html_url' > /tmp/issue_urls.txt
+        cat /tmp/issue_urls.txt
+    outputFiles:
+      - /tmp/issues.json
+      - /tmp/issue_urls.txt
+
+  - id: process_issues
+    type: io.kestra.plugin.core.flow.ForEach
+    description: "Process each issue"
+    values: "{{ read('/tmp/issue_urls.txt') | split('\n') | select(. != '') }}"
+    tasks:
+      - id: fix_issue
+        type: io.kestra.plugin.core.flow.Subflow
+        namespace: dev.autofix
+        flowId: ai-issue-autofix
+        inputs:
+          issue_url: "{{ taskrun.value }}"
+          repo_url: "{{ inputs.repo_url }}"
+          apply_fix: true
+          create_pr: "{{ inputs.create_prs }}"
+        wait: true
+
+  - id: generate_report
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "Generate execution report"
+    commands:
+      - echo "📊 Batch Autofix Report"
+      - echo "======================="
+      - echo "Repository: {{ inputs.repo_url }}"
+      - echo "Issues processed: {{ outputs.process_issues.iterations }}"
+      - echo "Execution ID: {{ execution.id }}"
+      - echo "Timestamp: {{ execution.startDate }}"
+
+triggers:
+  - id: scheduled
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 */6 * * *"  # Every 6 hours
+    description: "Run batch autofix every 6 hours"
+    disabled: true  # Enable when ready for production

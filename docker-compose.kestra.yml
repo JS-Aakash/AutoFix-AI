@@ -1,0 +1,78 @@
+services:
+  # Kestra Server with Node.js
+  kestra:
+    build:
+      context: ./docker/kestra
+      dockerfile: Dockerfile
+    container_name: kestra-server
+    command: server standalone
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    environment:
+      # API Keys - Load from .env file
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      # Docker configuration for Windows
+      DOCKER_HOST: npipe:////./pipe/docker_engine
+      # Kestra Configuration
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: jdbc:postgresql://postgres:5432/kestra
+            driverClassName: org.postgresql.Driver
+            username: kestra
+            password: kestra
+        kestra:
+          server:
+            basic-auth:
+              enabled: false
+          repository:
+            type: postgres
+          queue:
+            type: postgres
+          storage:
+            type: local
+            local:
+              base-path: /app/storage
+    volumes:
+      - kestra-data:/app/storage
+      - ./kestra/workflows:/app/flows
+      - ./:/app/ai-issue-autofix-mvp
+      # Docker socket for Windows
+      - //./pipe/docker_engine://./pipe/docker_engine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kestra-network
+    restart: unless-stopped
+
+  # PostgreSQL Database for Kestra
+  postgres:
+    image: postgres:15-alpine
+    container_name: kestra-postgres
+    environment:
+      POSTGRES_DB: kestra
+      POSTGRES_USER: kestra
+      POSTGRES_PASSWORD: kestra
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - kestra-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U kestra" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  kestra-data:
+    driver: local
+  postgres-data:
+    driver: local
+
+networks:
+  kestra-network:
+    driver: bridge

@@ -1,0 +1,102 @@
+id: ai-issue-autofix
+namespace: dev.autofix
+description: AI-powered automated issue fixing workflow
+
+inputs:
+  - id: issue_url
+    type: STRING
+    required: true
+    description: GitHub issue URL (e.g., https://github.com/owner/repo/issues/123)
+  
+  - id: repo_url
+    type: STRING
+    required: true
+    description: Repository URL (e.g., https://github.com/owner/repo.git)
+  
+  - id: openai_api_key
+    type: STRING
+    required: true
+    description: OpenAI/OpenRouter/Cerebras API Key
+  
+  - id: github_token
+    type: STRING
+    required: true
+    description: GitHub Personal Access Token
+  
+  - id: apply_fix
+    type: BOOLEAN
+    defaults: false
+    description: Whether to apply the fix (dry-run if false)
+  
+  - id: create_pr
+    type: BOOLEAN
+    defaults: false
+    description: Whether to create a pull request
+
+tasks:
+  - id: validate_inputs
+    type: io.kestra.plugin.scripts.shell.Script
+    description: Validate input parameters
+    runner: PROCESS
+    script: |
+      echo "Validating inputs..."
+      echo "Issue URL: {{ inputs.issue_url }}"
+      echo "Repo URL: {{ inputs.repo_url }}"
+      echo "Apply Fix: {{ inputs.apply_fix }}"
+      echo "Create PR: {{ inputs.create_pr }}"
+
+  - id: run_autofix
+    type: io.kestra.plugin.scripts.shell.Script
+    description: Execute AI autofix script
+    runner: PROCESS
+    env:
+      OPENAI_API_KEY: "{{ inputs.openai_api_key }}"
+      GITHUB_TOKEN: "{{ inputs.github_token }}"
+      GIT_ASKPASS: /tmp/git-askpass.sh
+      GIT_TERMINAL_PROMPT: "0"
+    script: |
+      #!/bin/bash
+      set -e
+      
+      # Configure Git
+      git config --global user.email "ai-autofix@kestra.io"
+      git config --global user.name "AI Autofix Bot"
+      
+      # Create a git-askpass script to provide credentials
+      cat > /tmp/git-askpass.sh << 'ASKPASS_EOF'
+      #!/bin/bash
+      echo "$GITHUB_TOKEN"
+      ASKPASS_EOF
+      chmod +x /tmp/git-askpass.sh
+      
+      cd /app/ai-issue-autofix-mvp
+      
+      # Run the autofix script
+      if [ "{{ inputs.create_pr }}" = "true" ]; then
+        bash run_with_cline.sh --issue "{{ inputs.issue_url }}" --repo "{{ inputs.repo_url }}" --push
+      elif [ "{{ inputs.apply_fix }}" = "true" ]; then
+        bash run_with_cline.sh --issue "{{ inputs.issue_url }}" --repo "{{ inputs.repo_url }}" --apply
+      else
+        bash run_with_cline.sh --issue "{{ inputs.issue_url }}" --repo "{{ inputs.repo_url }}"
+      fi
+      
+      # Output patch location
+      echo "Patch generated at: /app/ai-issue-autofix-mvp/workspace/patch.diff"
+
+  - id: notify_completion
+    type: io.kestra.plugin.scripts.shell.Script
+    description: Log completion status
+    runner: PROCESS
+    script: |
+      echo "✅ Autofix workflow completed successfully"
+      echo "Issue: {{ inputs.issue_url }}"
+      echo "Execution ID: {{ execution.id }}"
+
+errors:
+  - id: error_handler
+    type: io.kestra.plugin.scripts.shell.Script
+    description: Handle workflow errors
+    runner: PROCESS
+    script: |
+      echo "❌ Autofix workflow failed"
+      echo "Check the execution logs for details"

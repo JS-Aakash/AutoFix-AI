@@ -43,74 +43,177 @@ async function main() {
         .replace('{{ISSUE_BODY}}', issueBody)
         .replace('{{CODEBASE}}', codebaseContext);
 
-    // 3. Call OpenAI
-    try {
-        const completion = await openai.chat.completions.create({
-            messages: [{ role: 'user', content: prompt }],
-            model: isOpenRouter ? 'google/gemini-2.0-flash-exp:free' :
-                isCerebras ? 'llama3.1-8b' : 'gpt-4o',
-            max_tokens: 2000,
-        });
+    // 3. Call OpenAI with retry logic and JSON mode
+    let responseData = null;
+    const maxRetries = 3;
 
-        const responseContent = completion.choices[0].message.content;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`Attempt ${attempt}/${maxRetries}: Calling AI...`);
 
-        // 4. Parse Response and Generate Diff
-        const diffs = [];
-        // Regex to match "File: <path>" followed by code block
-        const fileRegex = /File: (.*?)\n```[\w]*\n([\s\S]*?)```/g;
-        let match;
-        const fileContentMap = new Map();
+            const completion = await openai.chat.completions.create({
+                messages: [{ role: 'user', content: prompt }],
+                model: isOpenRouter ? 'google/gemini-2.0-flash-exp:free' :
+                    isCerebras ? 'llama3.1-8b' : 'gpt-4o',
+                response_format: { type: "json_object" },
+                max_tokens: 4000,
+                temperature: 0.3,
+            });
 
-        while ((match = fileRegex.exec(responseContent)) !== null) {
-            const filePathRelative = match[1].trim();
-            const newContent = match[2]; // Content inside code block
-            fileContentMap.set(filePathRelative, newContent);
-        }
+            const responseContent = completion.choices[0].message.content;
 
-        for (const [filePathRelative, newContent] of fileContentMap.entries()) {
-            const originalFilePath = path.join(repoPath, filePathRelative);
-            const tempFilePath = path.join(repoPath, `${filePathRelative}.new`);
+            // Parse JSON response
+            try {
+                responseData = JSON.parse(responseContent);
 
-            if (fs.existsSync(originalFilePath)) {
-                fs.writeFileSync(tempFilePath, newContent);
-
-                try {
-                    // Generate diff using git
-                    try {
-                        execSync(`git diff --no-index --ignore-space-at-eol "${filePathRelative}" "${filePathRelative}.new"`, { cwd: repoPath });
-                    } catch (e) {
-                        // git diff exits with 1 when there is a diff
-                        if (e.stdout) {
-                            let diffOutput = e.stdout.toString();
-                            // Fix the header to look like a standard git patch
-                            // Escape regex special chars in filename
-                            const escapedPath = filePathRelative.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                            diffOutput = diffOutput.replace(new RegExp(`b/${escapedPath}.new`, 'g'), `b/${filePathRelative}`);
-                            diffs.push(diffOutput);
-                        }
+                // Validate response
+                if (validateResponse(responseData)) {
+                    console.log('✅ AI response validated successfully');
+                    break;
+                } else {
+                    console.warn(`⚠️ AI response validation failed (attempt ${attempt}/${maxRetries})`);
+                    if (attempt === maxRetries) {
+                        console.error('❌ Failed to get valid response after all retries');
+                        console.error('Response:', responseContent);
+                        process.exit(1);
                     }
-                } finally {
-                    if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                 }
-            } else {
-                console.warn(`Skipping unknown file: ${filePathRelative}`);
+            } catch (parseError) {
+                console.error(`JSON parse error on attempt ${attempt}:`, parseError.message);
+                if (attempt === maxRetries) {
+                    console.error('Failed to parse JSON response');
+                    console.error('Response:', responseContent);
+                    process.exit(1);
+                }
+                await new Promise(resolve => setTimeout(resolve, 2000));
             }
+        } catch (error) {
+            console.error(`Error on attempt ${attempt}:`, error.message);
+            if (attempt === maxRetries) {
+                console.error('Error calling OpenAI:', error);
+                process.exit(1);
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
+    }
 
-        if (diffs.length > 0) {
-            const fullPatch = diffs.join('\n');
-            const patchPath = path.join(repoPath, 'patch.diff');
-            fs.writeFileSync(patchPath, fullPatch);
-            console.log(`Patch written to ${patchPath}`);
+    // 4. Generate diffs from JSON response
+    const diffs = [];
+    const filesToProcess = responseData.files || [];
+
+    console.log(`Processing ${filesToProcess.length} file(s)...`);
+
+    for (const fileData of filesToProcess) {
+        const filePathRelative = fileData.path;
+        const newContent = fileData.content;
+
+        console.log(`Processing: ${filePathRelative}`);
+
+        const originalFilePath = path.join(repoPath, filePathRelative);
+        const tempFilePath = path.join(repoPath, `${filePathRelative}.new`);
+
+        if (fs.existsSync(originalFilePath)) {
+            // File exists - generate a diff
+            fs.writeFileSync(tempFilePath, newContent);
+
+            try {
+                // Generate diff using git
+                try {
+                    execSync(`git diff --no-index --ignore-space-at-eol "${filePathRelative}" "${filePathRelative}.new"`, { cwd: repoPath });
+                } catch (e) {
+                    // git diff exits with 1 when there is a diff
+                    if (e.stdout) {
+                        let diffOutput = e.stdout.toString();
+                        // Fix the header to look like a standard git patch
+                        const escapedPath = filePathRelative.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        diffOutput = diffOutput.replace(new RegExp(`b/${escapedPath}.new`, 'g'), `b/${filePathRelative}`);
+                        diffs.push(diffOutput);
+                    }
+                }
+            } finally {
+                if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+            }
         } else {
-            console.error('No changes detected or failed to parse AI response.');
-            console.log('Response:', responseContent);
-        }
+            // File doesn't exist - create a new file diff
+            console.log(`Generating diff for new file: ${filePathRelative}`);
 
-    } catch (error) {
-        console.error('Error calling OpenAI:', error);
+            const lines = newContent.split('\n');
+            let diffContent = `diff --git a/${filePathRelative} b/${filePathRelative}\n`;
+            diffContent += `new file mode 100644\n`;
+            diffContent += `index 0000000..0000000\n`;
+            diffContent += `--- /dev/null\n`;
+            diffContent += `+++ b/${filePathRelative}\n`;
+            diffContent += `@@ -0,0 +1,${lines.length} @@\n`;
+
+            for (const line of lines) {
+                diffContent += `+${line}\n`;
+            }
+
+            diffs.push(diffContent);
+        }
+    }
+
+    if (diffs.length > 0) {
+        const fullPatch = diffs.join('\n');
+        const patchPath = path.join(repoPath, 'patch.diff');
+        fs.writeFileSync(patchPath, fullPatch);
+        console.log(`✅ Patch written to ${patchPath}`);
+        console.log(`📝 Modified ${diffs.length} file(s)`);
+    } else {
+        console.error('❌ No changes detected');
+        console.log('Response:', JSON.stringify(responseData, null, 2));
         process.exit(1);
     }
+}
+
+// Validation function for JSON response
+function validateResponse(data) {
+    if (!data || typeof data !== 'object') {
+        console.warn('Validation failed: Response is not an object');
+        return false;
+    }
+
+    if (!Array.isArray(data.files)) {
+        console.warn('Validation failed: No files array found');
+        return false;
+    }
+
+    if (data.files.length === 0) {
+        console.warn('Validation failed: Files array is empty');
+        return false;
+    }
+
+    console.log(`Found ${data.files.length} file(s) in response`);
+
+    // Validate each file
+    for (const file of data.files) {
+        if (!file.path || typeof file.path !== 'string') {
+            console.warn('Validation failed: File missing path');
+            return false;
+        }
+
+        if (!file.content || typeof file.content !== 'string') {
+            console.warn(`Validation failed: File ${file.path} missing content`);
+            return false;
+        }
+
+        if (file.content.length < 10) {
+            console.warn(`Validation failed: File ${file.path} has insufficient content`);
+            return false;
+        }
+
+        // Check for placeholder filenames
+        if (file.path.includes('<') || file.path.includes('>') ||
+            file.path.includes('path/to') || file.path.endsWith('.ext')) {
+            console.warn(`Validation failed: Placeholder filename detected: ${file.path}`);
+            return false;
+        }
+
+        console.log(`  ✓ ${file.path} (${file.content.length} chars)`);
+    }
+
+    return true;
 }
 
 function readRepo(dir, fileList = [], rootDir = dir) {
@@ -124,6 +227,10 @@ function readRepo(dir, fileList = [], rootDir = dir) {
                 readRepo(filePath, fileList, rootDir);
             }
         } else {
+            // Skip package-lock.json and patch.diff
+            if (file === 'package-lock.json' || file === 'patch.diff') {
+                continue;
+            }
             // Simple filter for text files
             if (['.js', '.ts', '.md', '.json', '.html', '.css', '.txt'].includes(path.extname(file))) {
                 const content = fs.readFileSync(filePath, 'utf8');

@@ -143,6 +143,37 @@ async function main() {
     console.log(`🌿 Creating branch ${branchName}...`);
     runCmd(`git checkout -b ${branchName}`, WORKSPACE_DIR);
 
+    // Configure Git to use token for authentication
+    console.log('🔐 Configuring Git authentication...');
+
+    // Debug: Check if token is available
+    const tokenPresent = process.env.GITHUB_TOKEN ? 'YES' : 'NO';
+    const tokenLength = process.env.GITHUB_TOKEN ? process.env.GITHUB_TOKEN.length : 0;
+    const tokenPrefix = process.env.GITHUB_TOKEN ? process.env.GITHUB_TOKEN.substring(0, 7) : 'NONE';
+    console.log(`Token present: ${tokenPresent}, Length: ${tokenLength}, Prefix: ${tokenPrefix}...`);
+
+    // Extract repo owner and name from URL
+    const repoMatch = REPO_URL.match(/github\.com\/(.+?)\/(.+?)(\.git)?$/);
+    if (repoMatch) {
+        const owner = repoMatch[1];
+        const repo = repoMatch[2].replace('.git', '');
+
+        // URL-encode the token to handle special characters
+        const encodedToken = encodeURIComponent(process.env.GITHUB_TOKEN);
+        const authenticatedUrl = `https://${encodedToken}@github.com/${owner}/${repo}.git`;
+
+        console.log(`Setting remote URL with encoded token (length: ${encodedToken.length})`);
+        runCmd(`git remote set-url origin "${authenticatedUrl}"`, WORKSPACE_DIR);
+
+        // Verify the remote was set correctly
+        console.log('Verifying remote URL...');
+        runCmd(`git remote -v`, WORKSPACE_DIR);
+    }
+
+
+
+
+
     // 4. Run Agent
     console.log('🤖 Running Cline Agent...');
 
@@ -244,14 +275,53 @@ async function main() {
             }
         }
 
-        // Tests
+        // Tests with iterative refinement
         if (fs.existsSync(path.join(WORKSPACE_DIR, 'package.json'))) {
             console.log('🧪 Running tests...');
-            try {
-                runCmd('npm install', WORKSPACE_DIR);
-                runCmd('npm test', WORKSPACE_DIR);
-            } catch (e) {
-                console.warn('⚠️ Tests failed, but continuing...');
+
+            const maxTestRetries = 2;
+            let testsPassed = false;
+
+            for (let testAttempt = 1; testAttempt <= maxTestRetries; testAttempt++) {
+                try {
+                    runCmd('npm install', WORKSPACE_DIR, { exitOnError: false });
+                    const testOutput = runCmd('npm test', WORKSPACE_DIR);
+                    console.log('✅ Tests passed!');
+                    testsPassed = true;
+                    break;
+                } catch (e) {
+                    console.warn(`⚠️ Tests failed (attempt ${testAttempt}/${maxTestRetries})`);
+
+                    if (testAttempt < maxTestRetries) {
+                        console.log('🔄 Attempting to fix test failures...');
+
+                        // Read test failure output
+                        const testOutput = e.stdout ? e.stdout.toString() : e.message;
+
+                        // Use test_failure_prompt to generate a fix
+                        const testFailurePrompt = fs.readFileSync(
+                            path.join(__dirname, '../prompts/test_failure_prompt.txt'),
+                            'utf8'
+                        );
+
+                        const refinedPrompt = testFailurePrompt
+                            .replace('{{TEST_OUTPUT}}', testOutput)
+                            .replace('{{ISSUE_BODY}}', issueBody)
+                            .replace('{{CODEBASE}}', readRepo(WORKSPACE_DIR).map(f =>
+                                `File: ${f.path}\nContent:\n${f.content}\n`
+                            ).join('\n---\n'));
+
+                        // Call agent again with test failure context
+                        console.log('Calling AI to fix test failures...');
+                        // For now, we'll skip the retry to avoid complexity
+                        // In production, you'd call the agent again here
+                        console.warn('Test refinement not implemented yet - continuing...');
+                    }
+                }
+            }
+
+            if (!testsPassed) {
+                console.warn('⚠️ Tests did not pass after all attempts, but continuing...');
             }
         }
 

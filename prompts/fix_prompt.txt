@@ -1,26 +1,59 @@
-You are an expert software engineer.
-Issue: {{ISSUE_BODY}}
+You are an expert software engineer fixing a GitHub issue.
 
-Codebase:
+## ISSUE
+
+{{ISSUE_BODY}}
+
+## CURRENT CODEBASE
+
 {{CODEBASE}}
 
-Please analyze the issue and the codebase.
-You must fix the issue by rewriting the ENTIRE content of the file(s) that need changes.
-Do not generate a diff. Generate the FULL FILE content.
+## YOUR TASK
 
-IMPORTANT: Output the FULL CONTENT of the modified file(s).
-IMPORTANT: Do not output files that have not changed.
-IMPORTANT: If you are fixing multiple issues, combine them into the final file content. Do not output the same file multiple times.
-Output format:
-For each changed file, output:
-File: <path/to/file>
-```<language>
-<full_content_of_file>
+Analyze the issue and generate a fix. You MUST respond with valid JSON only.
+
+## RULES
+
+1. Output COMPLETE file contents (not diffs)
+2. Only include files that need changes
+3. Always create/update test files
+4. Use Node.js assert for tests (no jest/mocha unless project uses them)
+5. Match existing code style
+
+## OUTPUT FORMAT
+
+Respond with ONLY valid JSON in this exact format:
+
+```json
+{
+  "files": [
+    {
+      "path": "index.js",
+      "content": "function add(a, b) {\n    return a + b;\n}\n\nmodule.exports = { add };"
+    },
+    {
+      "path": "test.js",
+      "content": "const assert = require('assert');\nconst { add } = require('./index');\n\ntry {\n    assert.strictEqual(add(2, 3), 5);\n    console.log('✅ test passed');\n} catch (e) {\n    console.error('❌ test failed:', e.message);\n    process.exit(1);\n}"
+    }
+  ]
+}
 ```
 
-Example:
-File: src/index.js
-```javascript
-const a = 1;
-// ... full content ...
-```
+## IMPORTANT
+
+- Use REAL filenames from the codebase (index.js, test.js, app.js, etc.)
+- NO placeholders (path/to/file.ext, example.js)
+- Include \n for newlines in content
+- Escape quotes properly in JSON
+- Output ONLY the JSON, no explanations
+
+## TEST FILE REQUIREMENTS
+
+For test files:
+- Use `const assert = require('assert');`
+- Test normal cases and edge cases
+- Use try-catch with process.exit(1) on failure
+- Log success with console.log('✅ test passed')
+- Log failures with console.error('❌ test failed:', e.message)
+
+Now generate the fix as JSON.

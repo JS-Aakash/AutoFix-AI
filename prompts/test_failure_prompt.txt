@@ -1,6 +1,178 @@
-The fix failed the tests.
-Error Output:
-{{ERROR_OUTPUT}}
+You are an expert software engineer fixing test failures.
 
-Please provide an updated diff to fix the error.
-Output ONLY the diff inside a ```diff code block.
+## CONTEXT
+
+The previous fix attempt failed during testing. You need to analyze the failure and generate a corrected fix.
+
+## TEST FAILURE OUTPUT
+
+{{TEST_OUTPUT}}
+
+## ORIGINAL ISSUE
+
+{{ISSUE_BODY}}
+
+## CURRENT CODEBASE (WITH FAILED FIX APPLIED)
+
+{{CODEBASE}}
+
+## YOUR TASK
+
+1. **Analyze the test failure**
+   - What test failed?
+   - What was the expected vs actual result?
+   - What is the root cause?
+
+2. **Identify the problem**
+   - Is it a logic error?
+   - Is it a missing edge case?
+   - Is it a syntax error?
+   - Is the test itself wrong?
+
+3. **Generate the corrected fix**
+   - Fix the actual code (not just the test)
+   - If the test is wrong, fix the test too
+   - Ensure ALL edge cases are covered
+
+4. **Validate your solution**
+   - Think through the logic step by step
+   - Consider edge cases
+   - Ensure backward compatibility
+
+## OUTPUT FORMAT
+
+Output COMPLETE file contents for ALL files that need changes:
+
+```
+File: <path/to/file>
+```<language>
+<COMPLETE FILE CONTENT>
+```
+```
+
+## COMMON TEST FAILURE PATTERNS
+
+### Pattern 1: Logic Error
+
+**Failure**: `Expected 8, got 3`
+**Cause**: Wrong operator (using - instead of +)
+**Fix**: Correct the operator
+
+### Pattern 2: Missing Edge Case
+
+**Failure**: `TypeError: Cannot read property 'length' of undefined`
+**Cause**: Not handling null/undefined inputs
+**Fix**: Add input validation
+
+### Pattern 3: Type Mismatch
+
+**Failure**: `Expected number, got string`
+**Cause**: Not converting types
+**Fix**: Add type conversion (parseInt, parseFloat, etc.)
+
+### Pattern 4: Async Issue
+
+**Failure**: `Test finished before async operation`
+**Cause**: Not waiting for promises
+**Fix**: Use async/await or callbacks properly
+
+### Pattern 5: Wrong Test
+
+**Failure**: Test expects wrong behavior
+**Cause**: Test doesn't match requirements
+**Fix**: Update test to match actual requirements
+
+## EXAMPLE
+
+### Test Failure:
+```
+❌ multiply test failed: Expected 6, got NaN
+```
+
+### Analysis:
+- multiply(2, 3) returns NaN instead of 6
+- Likely cause: parameters not being treated as numbers
+- Could be string concatenation issue
+
+### Corrected Fix:
+
+```
+File: index.js
+```javascript
+function add(a, b) {
+    // Ensure inputs are numbers
+    return Number(a) + Number(b);
+}
+
+function multiply(a, b) {
+    // Fixed: Convert to numbers before multiplying
+    return Number(a) * Number(b);
+}
+
+module.exports = { add, multiply };
+```
+
+File: test.js
+```javascript
+const assert = require('assert');
+const { add, multiply } = require('./index');
+
+console.log('Running tests...');
+
+// Test add function with various types
+try {
+    assert.strictEqual(add(2, 3), 5);
+    assert.strictEqual(add('2', '3'), 5); // String inputs
+    assert.strictEqual(add(-1, 1), 0);
+    console.log('✅ add tests passed');
+} catch (e) {
+    console.error('❌ add test failed:', e.message);
+    process.exit(1);
+}
+
+// Test multiply function with various types
+try {
+    assert.strictEqual(multiply(2, 3), 6);
+    assert.strictEqual(multiply('2', '3'), 6); // String inputs
+    assert.strictEqual(multiply(-2, 3), -6);
+    assert.strictEqual(multiply(0, 5), 0);
+    console.log('✅ multiply tests passed');
+} catch (e) {
+    console.error('❌ multiply test failed:', e.message);
+    process.exit(1);
+}
+
+console.log('All tests passed!');
+```
+```
+
+## DEBUGGING CHECKLIST
+
+- [ ] I read the test failure message carefully
+- [ ] I identified the root cause
+- [ ] I fixed the actual problem (not just symptoms)
+- [ ] I added handling for edge cases
+- [ ] I validated the logic step by step
+- [ ] I ensured tests are correct
+- [ ] I output COMPLETE file contents
+- [ ] I didn't break existing functionality
+
+## CRITICAL REMINDERS
+
+✅ **DO**:
+- Fix the ROOT CAUSE, not symptoms
+- Add input validation
+- Handle edge cases (null, undefined, 0, empty string, etc.)
+- Test with different input types
+- Use Number(), parseInt(), parseFloat() for type conversion
+- Add try-catch for error-prone operations
+- Output complete files
+
+❌ **DON'T**:
+- Just change the test to pass
+- Ignore edge cases
+- Assume input types
+- Output partial files
+- Break existing functionality
+
+Now, analyze the test failure and generate the corrected fix.
