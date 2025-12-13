@@ -1,0 +1,16 @@
+node_modules
+npm-debug.log
+.env
+.env.local
+.git
+.gitignore
+*.md
+!README.md
+workspace
+frontend
+docker-compose*.yml
+.vscode
+.idea
+*.log
+patch.diff
+temp_issue_body.txt

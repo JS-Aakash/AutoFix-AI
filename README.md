@@ -191,6 +191,16 @@ node src/orchestrator.js \
 
 ---
 
+## ☁️ **Cloud Deployment**
+
+Want to deploy this to production? We've got you covered:
+
+- **🚂 [Railway Deployment](DEPLOY_RAILWAY.md)** - Easiest option, one-click deploy
+- **🔷 [Vercel Frontend](DEPLOY_TO_VERCEL.md)** - Deploy the Next.js frontend
+- **🌐 [Full Backend Deployment](DEPLOY_BACKEND.md)** - AWS, DigitalOcean, Render options
+
+---
+
 ## 🤝 **Contributing**
 
 Contributions, issues, and feature requests are welcome!
