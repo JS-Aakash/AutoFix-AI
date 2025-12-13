@@ -12,16 +12,25 @@ RUN apt-get update && \
 # Verify installation
 RUN node --version && npm --version
 
+# Set working directory for our app
+WORKDIR /app/ai-autofix
+
 # Copy application files
-WORKDIR /app
 COPY package*.json ./
-RUN npm install
+RUN npm install --production
 
 COPY src ./src
 COPY prompts ./prompts
-COPY kestra ./kestra
+COPY kestra/workflows ./workflows
 
-# Set up Kestra configuration for Railway
+# Create storage directory
+RUN mkdir -p /app/storage && chown -R kestra:kestra /app/storage
+RUN chown -R kestra:kestra /app/ai-autofix
+
+# Switch back to kestra user
+USER kestra
+
+# Set environment variables for Railway
 ENV KESTRA_CONFIGURATION="\
     datasources:\n\
     postgres:\n\
@@ -58,11 +67,9 @@ ENV KESTRA_CONFIGURATION="\
     allowCredentials: true\n\
     "
 
-# Create storage directory
-RUN mkdir -p /app/storage
-
 # Expose port
 EXPOSE 8080
 
-# Start Kestra
-CMD ["server", "standalone"]
+# The base kestra/kestra image has ENTRYPOINT ["/app/kestra"]
+# and default CMD ["server", "standalone"]
+# We don't need to override it - it will use the base image's defaults

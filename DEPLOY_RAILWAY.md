@@ -49,6 +49,11 @@
 
 ## Troubleshooting
 
+### "The executable kestra could not be found"
+- **Cause**: Dockerfile CMD/ENTRYPOINT was incorrect
+- **Fix**: Updated in latest version - make sure you pull latest changes
+- **Solution**: The Dockerfile now properly inherits from `kestra/kestra:latest` without overriding the entrypoint
+
 ### App crashes on start
 - Check the **Logs** in Railway dashboard
 - Verify environment variables are set correctly
