@@ -1,12 +1,114 @@
-# 🤖 AutoFix AI - Automated GitHub Issue Resolution
+<div align="center">
+
+<img src="./assets/git-it-done-logo.jpg" alt="Git-it-done AI Agent Logo" width="180"/>
+
+# 🤖 Git-it-done — AI Agent  
+### Automated GitHub Issue Resolution with AI
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
 [![Kestra](https://img.shields.io/badge/Kestra-Latest-blue)](https://kestra.io/)
+[![CodeRabbit](https://img.shields.io/badge/CodeRabbit-Integrated-red)](https://coderabbit.ai/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**AutoFix AI** is an intelligent, automated platform that fixes GitHub issues using AI. Select an issue, let our AI agents analyze the codebase, generate a fix, and automatically create a Pull Request for you—all in minutes!
+</div>
 
-![AutoFix AI Demo](https://via.placeholder.com/800x400/1a1a1a/ffffff?text=AutoFix+AI+Demo)
+---
+
+## 🎯 Problem Statement
+
+### The Operational Reality of Issue Resolution
+
+GitHub issues remain unresolved not because they are inherently difficult, but because the workflow required to close them—from analysis through testing to pull request preparation—imposes **cumulative operational overhead**.
+
+Resolving a typical issue requires:
+- **Codebase Familiarization**: Understanding project structure, architectural patterns, and existing conventions  
+- **Contextual Code Location**: Identifying which files and functions are affected by the issue  
+- **Implementation & Iteration**: Writing, testing, and refining the solution across multiple cycles  
+- **Test Coverage**: Creating or modifying test cases to validate the fix  
+- **Pre-Merge Validation**: Running linters, type checkers, and test suites to prevent regressions  
+- **PR Preparation**: Structuring commits, writing descriptions, and ensuring CI/CD passes  
+
+This sequence is **deterministic and repeatable** across repositories.
+
+### Current System Limitations
+
+Existing AI-assisted tools address parts of this workflow:
+
+| Capability | Limitation |
+|-----------|-----------|
+| **Code Suggestions** | Requires developer context-switching and manual integration |
+| **Code Explanation** | Provides information without advancing the resolution |
+| **Snippet Generation** | Lacks repository-level context and test validation |
+| **Draft PRs** | Often require significant revision before merge-readiness |
+
+The developer's role remains **full-cycle coordination**—the AI provides materials, but humans must execute assembly and validation.
+
+### What's Missing
+
+There is no **end-to-end autonomous system** that accepts a GitHub issue and consistently delivers:
+1. A functioning implementation  
+2. Updated or new test coverage  
+3. Passing CI/CD checks  
+4. A PR ready for maintainer review  
+
+This gap leaves developers to perform low-value assembly work that could be systematized.
+
+---
+
+## 🚀 Project Pitch
+
+**Git-it-done** is an autonomous software engineering agent that completes the full issue-resolution workflow.
+
+It is not a code completion tool.  
+It does not stop at suggestions.  
+It executes end-to-end task completion.
+
+### The Execution Model
+
+Given a GitHub issue, Git-it-done:
+
+1. **Reads and Interprets** the issue requirements and context  
+2. **Analyzes the Repository** to understand codebase patterns and dependencies  
+3. **Implements Solutions** following detected code conventions  
+4. **Generates Test Cases** aligned with existing test patterns  
+5. **Validates Changes** through automated testing and linting  
+6. **Opens a PR** with structured commits and technical descriptions  
+
+The developer's responsibility is reduced to **review and merge**.
+
+### Design Philosophy
+
+This system addresses **operational friction**, not developer capability.
+
+Engineers are capable; the workflow is expensive. By automating the deterministic, repetitive steps of issue resolution, this agent:
+- Reduces time-to-close for maintainers  
+- Lowers the activation energy for contributors  
+- Converts backlog stagnation into forward momentum  
+- Preserves human judgment for review and architectural decisions  
+
+### Differentiation Points
+
+| Aspect | What Makes This Different |
+|--------|--------------------------|
+| **Scope** | Completes tasks end-to-end, not assisting with them. A PR is the output, not a starting point. |
+| **Validation** | Test execution is built-in, not optional. No PR is created without passing local test suites. |
+| **Observability** | Every step is logged and traceable. The developer can see **why** and **how** decisions were made. |
+| **Production-Ready** | Built on established tools (GitHub, Docker, Kestra, CodeRabbit)—not prototyped or simulated. |
+| **Determinism** | Workflows are reproducible. The same issue on the same codebase produces consistent results. |
+
+### The Value Proposition
+
+**Current State**: AI helps you write code.  
+**This System**: AI helps you **finish work**.
+
+If an issue can be clearly defined in a GitHub issue,  
+this agent should be able to close it autonomously.
+
+---
+
+> _From issue to PR. No hand-holding. Just Git it done._
+
+![Git-it-done AI Demo](https://via.placeholder.com/800x400/1a1a1a/ffffff?text=AutoFix+AI+Demo)
 
 ## ✨ **Key Features**
 
@@ -18,6 +120,29 @@
 - 🔄 **Automated Pull Requests** - The workflow creates ready-to-merge PRs automatically.
 - 🎨 **Modern Dark Mode UI** - A premium, hackathon-ready interface built with Tailwind CSS.
 - ⚡ **Kestra Orchestration** - Resilient, scalable workflow management powered by Kestra.
+
+---
+
+## 🐰 **CodeRabbit Integration**
+
+**Git-it-done** is natively integrated with **CodeRabbit**, an AI-powered code review platform that provides instant, high-quality PR reviews.
+
+### Why CodeRabbit?
+
+Every PR created by Git-it-done automatically receives:
+- **Instant AI Reviews** - Detailed analysis of code changes, potential bugs, and improvements
+- **Security Scanning** - Detection of common vulnerabilities and security best practices
+- **Performance Insights** - Identification of optimization opportunities
+- **Code Quality Checks** - Style consistency, maintainability, and architectural alignment
+- **Documentation Validation** - Verification that changes are properly documented
+
+### Setup CodeRabbit (30 seconds)
+
+1. Visit **[CodeRabbit.ai](https://coderabbit.ai/)** and sign up (free tier available).
+2. Install the **CodeRabbit GitHub App** on your repository.
+3. **Done!** Git-it-done automatically adds `@coderabbitai review` to every PR it creates.
+
+No additional configuration needed. CodeRabbit reviews are generated before your team sees the PR.
 
 ## 🚀 **Quick Start Guide**
 
