@@ -27,7 +27,7 @@ COPY kestra/workflows ./workflows
 RUN cat <<EOF > /app/application.yml
 datasources:
   postgres:
-    url: jdbc:h2:mem:public;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    url: jdbc:h2:mem:public;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     driverClassName: org.h2.Driver
 kestra:
   repository:
