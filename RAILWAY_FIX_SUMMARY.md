@@ -1,140 +1,96 @@
-# 🚀 Railway Deployment Fix - Summary
+# ⚠️ Railway Deployment Fix v2 - CRITICAL
 
-## Problem Identified
+## The Real Problem
 
-When deploying to Railway, you encountered this error:
-```
-Usage: node agent.js --issue-body <text> --repo-path <path>
-OpenAIError: The OPENAI_API_KEY environment variable is missing or empty
-```
+The error **"The executable `kestra` could not be found"** was caused by **TWO issues**:
 
-## Root Cause
-
-**Issue 1: Missing Environment Variables**
-- Railway doesn't automatically use your local `.env` file
-- Environment variables need to be configured in Railway's dashboard
-
-**Issue 2: Wrong Entry Point**
-- Railway was trying to run `npm start` → `node src/agent.js` directly
-- `agent.js` is designed to be called by Kestra workflows with specific command-line arguments
-- Running it without arguments causes the "Usage:" error
-
-## Solution Implemented
-
-### Files Created/Modified
-
-1. **`Dockerfile`** (Root directory)
-   - Railway-optimized Dockerfile
-   - Uses Kestra with H2 in-memory database (simpler than Postgres for Railway)
-   - Includes Node.js, all dependencies, and proper configuration
-   - Exposes port 8080 for the Kestra web UI and API
-
-2. **`railway.json`**
-   - Railway configuration file
-   - Specifies which Dockerfile to use
-   - Sets proper health checks and restart policies
-
-3. **`DEPLOY_RAILWAY.md`**
-   - Complete step-by-step Railway deployment guide
-   - Instructions for setting environment variables
-   - Troubleshooting tips
-
-4. **`.dockerignore`**
-   - Optimizes Docker build by excluding unnecessary files
-   - Speeds up deployment
-
-5. **`README.md`** (Updated)
-   - Added cloud deployment section with links to all deployment guides
-
-## Next Steps for You
-
-### 1. Push Changes to GitHub
-
-```bash
-git add .
-git commit -m "Add Railway deployment configuration"
-git push origin main
+### Issue 1: railway.json Override ❌
+The `railway.json` file had a `startCommand` that was overriding the Dockerfile's CMD:
+```json
+"startCommand": "kestra server standalone"  // ❌ This runs as shell command, kestra not in PATH
 ```
 
-### 2. Configure Railway
+**Fix**: Deleted `railway.json` entirely. Railway will auto-detect the Dockerfile.
 
-1. **Go to Railway Dashboard**: https://railway.app
-2. **Select your project** (or create new one from GitHub)
-3. **Add Environment Variables** (Variables tab):
-   ```
-   OPENAI_API_KEY=
-   GITHUB_TOKEN=
-   PORT=8080
-   ```
+### Issue 2: Missing CMD in Dockerfile ❌
+The Dockerfile wasn't explicitly setting the CMD, so it inherited the base image's default:
+```dockerfile
+# Base kestra/kestra image default:
+CMD ["--help"]  # ❌ This just shows help and exits
+```
 
-4. **Railway will auto-detect** the `Dockerfile` and rebuild
-
-### 3. Get Your Railway URL
-
-1. Go to **Settings** → **Networking**
-2. Click **Generate Domain**
-3. Copy the URL (e.g., `https://autofix-ai.up.railway.app`)
-
-### 4. Update Vercel Frontend
-
-1. Go to Vercel → Your project → **Settings** → **Environment Variables**
-2. Update `KESTRA_URL` to your Railway URL:
-   ```
-   KESTRA_URL=https://your-app-name.up.railway.app
-   ```
-3. Redeploy Vercel
-
-### 5. Test
-
-- Visit your Railway URL to see the Kestra UI
-- Use your frontend to trigger a workflow
-- Check Railway logs if issues occur
-
-## Important Notes
-
-### About H2 vs Postgres
-- The Railway Dockerfile uses **H2 in-memory database** instead of Postgres
-- This makes deployment simpler (single container)
-- ⚠️ **Data will be lost on restarts** (workflows, logs, etc.)
-- For production with persistent data, use AWS EC2 or DigitalOcean (see `DEPLOY_BACKEND.md`)
-
-### Memory Requirements
-- Kestra requires at least **512MB RAM**
-- Railway's free tier should work, but might need the Hobby plan ($5/month)
-- Monitor memory usage in Railway dashboard
-
-### Alternative Deployment Options
-
-If Railway doesn't work well:
-
-1. **AWS EC2** (Recommended for production)
-   - Free tier eligible (t2.medium)
-   - See `DEPLOY_BACKEND.md`
-
-2. **DigitalOcean** ($6/month)
-   - Simpler than AWS
-   - See `DEPLOY_BACKEND.md`
-
-3. **Render** (Free tier available, but limited)
-   - Can work but memory constraints
-   - See `DEPLOY_BACKEND.md`
-
-## Verification Checklist
-
-- [ ] Push changes to GitHub
-- [ ] Configure environment variables in Railway
-- [ ] Railway deployment succeeds (check logs)
-- [ ] Can access Kestra UI at Railway URL
-- [ ] Update Vercel's `KESTRA_URL`
-- [ ] Test full workflow from frontend
-
-## Need Help?
-
-- Check Railway logs for errors
-- Verify all environment variables are set correctly
-- Ensure you have sufficient Railway credits/plan
-- Refer to `DEPLOY_RAILWAY.md` for detailed troubleshooting
+**Fix**: Explicitly set `CMD ["server", "standalone"]` in the Dockerfile.
 
 ---
 
-**Status**: ✅ Ready to deploy!
+## What Changed
+
+### Files Modified:
+- **Dockerfile**: Added explicit `CMD ["server", "standalone"]`
+- **railway.json**: DELETED (was causing conflicts)
+
+### How It Works Now:
+```
+Railway Build → Dockerfile
+                    ↓
+                ENTRYPOINT: docker-entrypoint.sh → /app/kestra
+                    +
+                CMD: server standalone
+                    ↓
+                ✅ Kestra Server Starts
+```
+
+---
+
+## Push These Changes
+
+```bash
+git add .
+git commit -m "Fix Railway deployment - remove railway.json, add explicit CMD"
+git push origin main
+```
+
+Railway will automatically trigger a new deployment. This time it should work! 🎯
+
+---
+
+## Verify the Fix
+
+After Railway rebuilds:
+
+1. **Check Logs** - Should see:
+   ```
+   Starting Kestra...
+   Kestra server listening on port 8080
+   ```
+
+2. **Visit URL** - Your Railway domain should show the Kestra UI
+
+3. **No More Errors** - The "executable not found" error will be gone
+
+---
+
+## If It Still Fails
+
+Check these in order:
+
+1. **Environment Variables Set?**
+   - `OPENAI_API_KEY`
+   - `GITHUB_TOKEN`
+   - `PORT=8080`
+
+2. **Correct Dockerfile?**
+   - Last line should be: `CMD ["server", "standalone"]`
+   - No `railway.json` file should exist
+
+3. **Railway Build Logs**
+   - Look for "Successfully built"
+   - Check for any npm install errors
+
+4. **Memory Limit**
+   - Kestra needs 512MB+ RAM
+   - Check if Railway plan has enough memory
+
+---
+
+**Status**: This should absolutely fix the issue. The problem was the railway.json interfering with Docker's command execution.

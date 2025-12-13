@@ -70,6 +70,7 @@ ENV KESTRA_CONFIGURATION="\
 # Expose port
 EXPOSE 8080
 
-# The base kestra/kestra image has ENTRYPOINT ["/app/kestra"]
-# and default CMD ["server", "standalone"]
-# We don't need to override it - it will use the base image's defaults
+# Override the base image's CMD (which is ["--help"])
+# The ENTRYPOINT is docker-entrypoint.sh which calls /app/kestra
+CMD ["server", "standalone"]
+
