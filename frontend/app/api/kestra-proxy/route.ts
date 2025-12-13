@@ -22,9 +22,17 @@ export async function POST(req: Request) {
         formData.append('apply_fix', 'true');
         formData.append('create_pr', 'true');
 
+        // Create Basic Auth header
+        const kestraUser = process.env.KESTRA_EMAIL || "";
+        const kestraPass = process.env.KESTRA_PASSWORD || "";
+        const authHeader = 'Basic ' + Buffer.from(kestraUser + ':' + kestraPass).toString('base64');
+
         const kestraResponse = await fetch(kestraUrl, {
             method: 'POST',
-            headers: { 'Cookie': cookies },
+            headers: {
+                'Authorization': authHeader
+                // Removed 'Cookie': cookies - we shouldn't pass Next.js cookies to Kestra
+            },
             body: formData
         });
 
