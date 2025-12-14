@@ -15,6 +15,8 @@ export default function Home() {
   const [isFixing, setIsFixing] = useState(false);
   const [customApiKey, setCustomApiKey] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [autofixConfig, setAutofixConfig] = useState<any>(null);
+  const [useLocalKestra, setUseLocalKestra] = useState(false);
 
   const openFixDialog = () => {
     if (!selectedIssue || !selectedRepo) return;
@@ -24,29 +26,44 @@ export default function Home() {
   const confirmFix = async () => {
     setIsDialogOpen(false);
     setIsFixing(true);
-    try {
-      const res = await fetch('/api/kestra-proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          issueUrl: selectedIssue.html_url,
-          repoUrl: selectedRepo.html_url,
-          githubToken: (session as any)?.accessToken || '',
-          openaiKey: customApiKey
-        })
-      });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || `Request failed with status ${res.status}`);
+    if (useLocalKestra) {
+      try {
+        const res = await fetch('/api/kestra-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            issueUrl: selectedIssue.html_url,
+            repoUrl: selectedRepo.html_url,
+            githubToken: (session as any)?.accessToken || '',
+            openaiKey: customApiKey
+          })
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || `Request failed with status ${res.status}`);
+        }
+
+        const data = await res.json();
+        setJobId(data.jobId);
+        setAutofixConfig(null);
+      } catch (e: any) {
+        console.error(e);
+        alert("Failed to start Kestra autofix: " + e.message);
+      } finally {
+        setIsFixing(false);
       }
+    } else {
+      const config = {
+        issueUrl: selectedIssue.html_url,
+        repoUrl: selectedRepo.html_url,
+        githubToken: (session as any)?.accessToken || '',
+        openaiKey: customApiKey
+      };
 
-      const data = await res.json();
-      setJobId(data.jobId);
-    } catch (e: any) {
-      console.error(e);
-      alert("Failed to start autofix: " + e.message);
-    } finally {
+      setAutofixConfig(config);
+      setJobId("direct"); // Switch view
       setIsFixing(false);
     }
   };
@@ -301,6 +318,27 @@ export default function Home() {
                       </p>
                     </div>
 
+                    <div className="flex items-center gap-3 pt-2">
+                      <div
+                        className={`w-5 h-5 rounded border flex items-center justify-center cursor-pointer transition-colors ${useLocalKestra ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-600'}`}
+                        onClick={() => setUseLocalKestra(!useLocalKestra)}
+                      >
+                        {useLocalKestra && <div className="w-2.5 h-2.5 bg-white rounded-sm" />}
+                      </div>
+                      <label
+                        onClick={() => setUseLocalKestra(!useLocalKestra)}
+                        className="text-sm text-gray-300 cursor-pointer select-none"
+                      >
+                        Use Local Kestra (requires localhost:8080)
+                      </label>
+                    </div>
+                    {useLocalKestra && (
+                      <div className="mt-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-200 text-xs">
+                        ⚠️ <strong>Note:</strong> This option only works if you are running the frontend locally (`npm run dev`) alongside Docker.
+                        If deployed to Vercel, it cannot reach your localhost.
+                      </div>
+                    )}
+
                     <div className="flex gap-3 pt-4">
                       <button
                         onClick={() => setIsDialogOpen(false)}
@@ -335,6 +373,7 @@ export default function Home() {
                 <button
                   onClick={() => {
                     setJobId(null);
+                    setAutofixConfig(null);
                     setSelectedIssue(null);
                   }}
                   className="px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition-all"
@@ -346,9 +385,11 @@ export default function Home() {
 
             {/* Live Logs */}
             <LiveLogs
-              jobId={jobId}
+              jobId={jobId === "direct" ? undefined : jobId}
+              directStreamConfig={autofixConfig}
               onBack={() => {
                 setJobId(null);
+                setAutofixConfig(null);
                 setSelectedIssue(null);
               }}
             />

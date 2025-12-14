@@ -10,11 +10,17 @@ interface LogEntry {
 }
 
 interface LiveLogsProps {
-    jobId: string;
+    jobId?: string;
+    directStreamConfig?: {
+        issueUrl: string;
+        repoUrl: string;
+        githubToken: string;
+        openaiKey: string;
+    };
     onBack?: () => void;
 }
 
-export function LiveLogs({ jobId, onBack }: LiveLogsProps) {
+export function LiveLogs({ jobId, directStreamConfig, onBack }: LiveLogsProps) {
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [status, setStatus] = useState<string>("RUNNING");
     const [prUrl, setPrUrl] = useState<string | null>(null);
@@ -22,94 +28,137 @@ export function LiveLogs({ jobId, onBack }: LiveLogsProps) {
     const [currentStep, setCurrentStep] = useState("Initializing");
     const logsEndRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        if (!jobId) return;
+    const handleLogData = (data: any) => {
+        if (data.status) {
+            setStatus(data.status);
+            if (data.status === "SUCCESS") {
+                setProgress(100);
+                setCurrentStep("Completed!");
+                if (data.prUrl) setPrUrl(data.prUrl);
+            } else if (data.status === "FAILED") {
+                setCurrentStep("Failed");
+            }
+        }
 
-        const eventSource = new EventSource(`/api/fix/${jobId}/logs`);
+        if (data.message) {
+            const shouldSkip =
+                data.message.includes('Docker not found or not running') ||
+                data.message.includes('Falling back to local execution') ||
+                data.message.includes('Running agent locally');
 
-        eventSource.onmessage = (event) => {
-            try {
-                if (!event.data || event.data === "") return;
-                const data = JSON.parse(event.data);
+            if (!shouldSkip) {
+                setLogs((prev) => [...prev, data]);
 
-                if (data.status) {
-                    setStatus(data.status);
-                    if (data.status === "SUCCESS") {
-                        setProgress(100);
-                        setCurrentStep("Completed!");
-                        // Close connection cleanly on success
-                        eventSource.close();
-                    } else if (data.status === "FAILED") {
-                        setCurrentStep("Failed");
-                        eventSource.close();
-                    }
-                } else if (data.message) {
-                    // Filter out technical warnings
-                    const shouldSkip =
-                        data.message.includes('Docker not found or not running') ||
-                        data.message.includes('Falling back to local execution') ||
-                        data.message.includes('Running agent locally');
+                // Update progress based on workflow stages
+                const msg = data.message.toLowerCase();
+                if (msg.includes('starting') || msg.includes('fetching issue')) {
+                    setProgress(prev => Math.max(prev, 10));
+                    setCurrentStep("Fetching issue details");
+                } else if (msg.includes('cloning') || msg.includes('repository')) {
+                    setProgress(prev => Math.max(prev, 20));
+                    setCurrentStep("Cloning repository");
+                } else if (msg.includes('creating branch')) {
+                    setProgress(prev => Math.max(prev, 30));
+                    setCurrentStep("Creating fix branch");
+                } else if (msg.includes('running') && msg.includes('agent')) {
+                    setProgress(prev => Math.max(prev, 40));
+                    setCurrentStep("Analyzing code with AI");
+                } else if (msg.includes('calling ai') || msg.includes('attempt')) {
+                    setProgress(prev => Math.max(prev, 50));
+                    setCurrentStep("Generating fix");
+                } else if (msg.includes('validated') || msg.includes('patch')) {
+                    setProgress(prev => Math.max(prev, 70));
+                    setCurrentStep("Applying changes");
+                } else if (msg.includes('applying') || msg.includes('commit')) {
+                    setProgress(prev => Math.max(prev, 80));
+                    setCurrentStep("Committing changes");
+                } else if (msg.includes('pushing') || msg.includes('creating pr')) {
+                    setProgress(prev => Math.max(prev, 90));
+                    setCurrentStep("Creating pull request");
+                } else if (msg.includes('pr created') || msg.includes('done')) {
+                    setProgress(100);
+                    setCurrentStep("Completed!");
+                }
 
-                    if (!shouldSkip) {
-                        setLogs((prev) => [...prev, data]);
-
-                        // Update progress based on workflow stages
-                        const msg = data.message.toLowerCase();
-                        if (msg.includes('starting') || msg.includes('fetching issue')) {
-                            setProgress(prev => Math.max(prev, 10));
-                            setCurrentStep("Fetching issue details");
-                        } else if (msg.includes('cloning') || msg.includes('repository')) {
-                            setProgress(prev => Math.max(prev, 20));
-                            setCurrentStep("Cloning repository");
-                        } else if (msg.includes('creating branch')) {
-                            setProgress(prev => Math.max(prev, 30));
-                            setCurrentStep("Creating fix branch");
-                        } else if (msg.includes('running') && msg.includes('agent')) {
-                            setProgress(prev => Math.max(prev, 40));
-                            setCurrentStep("Analyzing code with AI");
-                        } else if (msg.includes('calling ai') || msg.includes('attempt')) {
-                            setProgress(prev => Math.max(prev, 50));
-                            setCurrentStep("Generating fix");
-                        } else if (msg.includes('validated') || msg.includes('patch')) {
-                            setProgress(prev => Math.max(prev, 70));
-                            setCurrentStep("Applying changes");
-                        } else if (msg.includes('applying') || msg.includes('commit')) {
-                            setProgress(prev => Math.max(prev, 80));
-                            setCurrentStep("Committing changes");
-                        } else if (msg.includes('pushing') || msg.includes('creating pr')) {
-                            setProgress(prev => Math.max(prev, 90));
-                            setCurrentStep("Creating pull request");
-                        } else if (msg.includes('pr created') || msg.includes('done')) {
-                            setProgress(100);
-                            setCurrentStep("Completed!");
-                        }
-                    }
-
-                    // Extract PR URL from logs
-                    if (data.message.includes('https://github.com') && data.message.includes('/pull/')) {
-                        const match = data.message.match(/(https:\/\/github\.com\/[^\s]+\/pull\/\d+)/);
-                        if (match) {
-                            setPrUrl(match[1]);
-                        }
+                // Extract PR URL from logs
+                if (data.message.includes('https://github.com') && data.message.includes('/pull/')) {
+                    const match = data.message.match(/(https:\/\/github\.com\/[^\s]+\/pull\/\d+)/);
+                    if (match) {
+                        setPrUrl(match[1]);
                     }
                 }
-            } catch (e) {
-                // Ignore parsing errors for keep-alive or empty messages
             }
-        };
+        }
+    };
 
-        eventSource.onerror = (e) => {
-            // Only log actual errors, not clean disconnects
-            if (eventSource.readyState !== EventSource.CLOSED) {
-                // console.warn("EventSource connection issue, reconnecting...");
-            }
-            // Don't close immediately on error, let it retry or use the status check to close
-        };
+    useEffect(() => {
+        // Mode 1: Direct Stream
+        if (directStreamConfig) {
+            const controller = new AbortController();
+            const startStream = async () => {
+                try {
+                    const response = await fetch('/api/autofix', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(directStreamConfig),
+                        signal: controller.signal
+                    });
 
-        return () => {
-            eventSource.close();
-        };
-    }, [jobId]);
+                    if (!response.body) throw new Error("No response body");
+
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        const chunk = decoder.decode(value, { stream: true });
+                        buffer += chunk;
+                        const lines = buffer.split('\n\n');
+                        buffer = lines.pop() || '';
+
+                        for (const line of lines) {
+                            if (line.trim().startsWith('data: ')) {
+                                try {
+                                    const jsonStr = line.trim().slice(6);
+                                    const data = JSON.parse(jsonStr);
+                                    handleLogData(data);
+                                } catch (e) { console.error('Parse error', e); }
+                            }
+                        }
+                    }
+                } catch (e: any) {
+                    if (e.name !== 'AbortError') {
+                        handleLogData({ message: `Connection Error: ${e.message}`, level: 'error', status: 'FAILED' });
+                    }
+                }
+            };
+            startStream();
+            return () => controller.abort();
+        }
+
+        // Mode 2: Legacy Kestra
+        if (jobId && !directStreamConfig) {
+            const eventSource = new EventSource(`/api/fix/${jobId}/logs`);
+
+            eventSource.onmessage = (event) => {
+                try {
+                    if (!event.data) return;
+                    handleLogData(JSON.parse(event.data));
+                } catch (e) { }
+            };
+
+            eventSource.onerror = () => {
+                // handle error
+            };
+
+            return () => {
+                eventSource.close();
+            };
+        }
+    }, [jobId, directStreamConfig]);
 
     useEffect(() => {
         logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
