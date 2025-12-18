@@ -108,7 +108,7 @@ this agent should be able to close it autonomously.
 
 > _From issue to PR. No hand-holding. Just Git it done._
 
-![Git-it-done AI Demo](https://via.placeholder.com/800x400/1a1a1a/ffffff?text=AutoFix+AI+Demo)
+![Git-it-done AI Demo](https://youtu.be/khv42VC4j8g)
 
 ## ✨ **Key Features**
 
@@ -347,7 +347,7 @@ Want to deploy this to production? We've got you covered:
 ## 🤝 **Contributing**
 
 Contributions, issues, and feature requests are welcome!
-Feel free to check the [issues page](https://github.com/JS-Aakash/AutoFix-AI/issues).
+Feel free to check the [issues page](https://github.com/JS-Aakash/Git-it-done/issues).
 
 ## 📄 **License**
 
