@@ -6,7 +6,7 @@ import { Providers } from "@/components/providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-    title: "AutoFix AI - Automated GitHub Issue Resolution",
+    title: "Git it Done - Automated GitHub Issue Resolution",
     description: "AI-powered platform to automatically fix GitHub issues with intelligent code generation and automated pull requests",
 };
 

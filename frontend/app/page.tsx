@@ -97,7 +97,7 @@ export default function Home() {
             </div>
 
             <h1 className="text-6xl md:text-7xl font-bold bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent animate-gradient">
-              AutoFix AI
+              Git it Done
             </h1>
 
             <p className="text-xl md:text-2xl text-gray-400 max-w-2xl mx-auto">
@@ -150,7 +150,7 @@ export default function Home() {
                 <Sparkles className="w-6 h-6 text-white" />
               </div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-                AutoFix AI
+                Git it Done
               </h1>
             </div>
 

@@ -160,8 +160,8 @@ Follow these steps to get the project running locally in under 10 minutes.
 ### **1. Clone the Repository**
 
 ```bash
-git clone https://github.com/JS-Aakash/AutoFix-AI.git
-cd AutoFix-AI
+git clone https://github.com/JS-Aakash/Git-it-done.git
+cd Git-it-done
 ```
 
 ---
